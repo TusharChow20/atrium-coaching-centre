@@ -13,12 +13,10 @@
     "build": "npm --workspace api run build && npm --workspace web run build",
     "test": "npm --workspace api run test"
   },
-  "dependencies": {
-    "pg": "^8.13.1"
-  },
   "devDependencies": {
-    "typescript": "^5.7.2",
-    "@types/node": "^22.10.2"
+    "@types/node": "^22.10.2",
+    "pg": "^8.23.0",
+    "typescript": "^5.7.2"
   },
   "engines": {
     "node": ">=20"
