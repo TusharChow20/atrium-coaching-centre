@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
 type Room = { id: number; name: string; capacity: number };
 type Person = { id: number; full_name: string; email: string; kind: string };
@@ -18,32 +18,28 @@ type Session = {
   places_remaining: number;
 };
 
-const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
+const apiBaseUrl = process.env.API_BASE_URL || "http://localhost:4000";
 
 const dayNames = [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-  'Sunday'
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
 ];
-
 const disciplines = [
-  'fitness',
-  'lifestyle',
-  'financial',
-  'nutrition',
-  'career',
-  'mindfulness'
+  "fitness",
+  "lifestyle",
+  "financial",
+  "nutrition",
+  "career",
+  "mindfulness",
 ];
-
-const sessionTypes = ['short', 'standard', 'intensive'];
-
+const sessionTypes = ["short", "standard", "intensive"];
 const hours = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
-
-const dayMilliseconds = 24 * 60 * 60 * 1000;
+const dayMs = 24 * 60 * 60 * 1000;
 
 function startOfWeek(date: Date) {
   const start = new Date(date);
@@ -58,24 +54,25 @@ export default function AdminSessions() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
 
-  const [date, setDate] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
+  const [date, setDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [discipline, setDiscipline] = useState(disciplines[0]);
   const [sessionType, setSessionType] = useState(sessionTypes[1]);
-  const [roomId, setRoomId] = useState('');
-  const [coachId, setCoachId] = useState('');
+  const [roomId, setRoomId] = useState("");
+  const [coachId, setCoachId] = useState("");
 
   const days = [0, 1, 2, 3, 4, 5, 6].map(
-    (offset) => new Date(weekStart.getTime() + offset * dayMilliseconds)
+    (offset) => new Date(weekStart.getTime() + offset * dayMs),
   );
 
   function loadSessions() {
-    const to = new Date(weekStart.getTime() + 7 * dayMilliseconds);
-
+    const to = new Date(weekStart.getTime() + 7 * dayMs);
     fetch(
       `${apiBaseUrl}/api/sessions?from=${weekStart.toISOString()}&to=${to.toISOString()}`,
-      { credentials: 'include' }
+      {
+        credentials: "include",
+      },
     )
       .then((res) => res.json())
       .then(setSessions);
@@ -86,18 +83,17 @@ export default function AdminSessions() {
   }, [weekStart]);
 
   useEffect(() => {
-    fetch(`${apiBaseUrl}/api/rooms`, { credentials: 'include' })
-      .then((res) => res.json())
+    fetch(`${apiBaseUrl}/api/rooms`, { credentials: "include" })
+      .then((r) => r.json())
       .then(setRooms);
-
-    fetch(`${apiBaseUrl}/api/people`, { credentials: 'include' })
-      .then((res) => res.json())
+    fetch(`${apiBaseUrl}/api/people`, { credentials: "include" })
+      .then((r) => r.json())
       .then(setPeople);
   }, []);
 
   function sessionsFor(day: Date, hour: number) {
-    return sessions.filter((session) => {
-      const starts = new Date(session.starts_at);
+    return sessions.filter((s) => {
+      const starts = new Date(s.starts_at);
       return (
         starts.getFullYear() === day.getFullYear() &&
         starts.getMonth() === day.getMonth() &&
@@ -109,129 +105,185 @@ export default function AdminSessions() {
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     await fetch(`${apiBaseUrl}/api/sessions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({
         room_id: Number(roomId),
         coach_id: Number(coachId),
         discipline,
         session_type: sessionType,
         starts_at: new Date(`${date}T${startTime}`).toISOString(),
-        ends_at: new Date(`${date}T${endTime}`).toISOString()
-      })
+        ends_at: new Date(`${date}T${endTime}`).toISOString(),
+      }),
     });
-
     loadSessions();
   }
 
   return (
-    <main>
-      <h1>Session calendar</h1>
+    <main className="space-y-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Session calendar</h1>
+        <div className="flex gap-2">
+          <button
+            className="btn-secondary"
+            onClick={() =>
+              setWeekStart(new Date(weekStart.getTime() - 7 * dayMs))
+            }
+          >
+            ← Previous week
+          </button>
+          <button
+            className="btn-secondary"
+            onClick={() =>
+              setWeekStart(new Date(weekStart.getTime() + 7 * dayMs))
+            }
+          >
+            Next week →
+          </button>
+        </div>
+      </div>
 
-      <p>
-        <button onClick={() => setWeekStart(new Date(weekStart.getTime() - 7 * dayMilliseconds))}>
-          Previous week
-        </button>{' '}
-        <button onClick={() => setWeekStart(new Date(weekStart.getTime() + 7 * dayMilliseconds))}>
-          Next week
-        </button>
-      </p>
-
-      <table className="calendar">
-        <thead>
-          <tr>
-            <th className="hour"></th>
-            {days.map((day, index) => (
-              <th key={index}>
-                {dayNames[index]} {day.getDate()}/{day.getMonth() + 1}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {hours.map((hour) => (
-            <tr key={hour}>
-              <th className="hour">{hour}:00</th>
-              {days.map((day, index) => (
-                <td key={index}>
-                  {sessionsFor(day, hour).map((session) => (
-                    <div className="entry" key={session.id}>
-                      {session.discipline} — {session.room_name} ({session.enrolled_count}/
-                      {session.room_capacity})
-                    </div>
-                  ))}
-                </td>
+      <div className="card overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr>
+              <th className="w-16 border-b border-gray-200 bg-gray-50 p-2"></th>
+              {days.map((day, i) => (
+                <th
+                  key={i}
+                  className="min-w-[130px] border-b border-gray-200 bg-gray-50 p-2 text-left font-medium"
+                >
+                  {dayNames[i]} {day.getDate()}/{day.getMonth() + 1}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {hours.map((hour) => (
+              <tr key={hour}>
+                <th className="border-b border-gray-100 bg-gray-50 p-2 text-left font-normal text-gray-500">
+                  {hour}:00
+                </th>
+                {days.map((day, i) => (
+                  <td
+                    key={i}
+                    className="h-12 border-b border-l border-gray-100 p-1 align-top"
+                  >
+                    {sessionsFor(day, hour).map((s) => (
+                      <div
+                        key={s.id}
+                        className="mb-1 truncate rounded bg-brand-50 px-1.5 py-0.5 text-brand-700"
+                      >
+                        {s.discipline} · {s.room_name} ({s.enrolled_count}/
+                        {s.room_capacity})
+                      </div>
+                    ))}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-      <h2>Create a session</h2>
-      <form onSubmit={onSubmit}>
-        <label>
-          <span>Date</span>
-          <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-        </label>
-        <label>
-          <span>Starts</span>
-          <input
-            type="time"
-            value={startTime}
-            onChange={(event) => setStartTime(event.target.value)}
-          />
-        </label>
-        <label>
-          <span>Ends</span>
-          <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
-        </label>
-        <label>
-          <span>Discipline</span>
-          <select value={discipline} onChange={(event) => setDiscipline(event.target.value)}>
-            {disciplines.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>Type</span>
-          <select value={sessionType} onChange={(event) => setSessionType(event.target.value)}>
-            {sessionTypes.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>Room</span>
-          <select value={roomId} onChange={(event) => setRoomId(event.target.value)}>
-            <option value=""></option>
-            {rooms.map((room) => (
-              <option key={room.id} value={room.id}>
-                {room.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>Coach</span>
-          <select value={coachId} onChange={(event) => setCoachId(event.target.value)}>
-            <option value=""></option>
-            {people.map((person) => (
-              <option key={person.id} value={person.id}>
-                {person.full_name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit">Create</button>
-      </form>
+      <section className="card max-w-xl">
+        <h2 className="mb-4 text-lg font-semibold">Create a session</h2>
+        <form onSubmit={onSubmit} className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="label">Date</label>
+            <input
+              className="input"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+          <div />
+          <div>
+            <label className="label">Starts</label>
+            <input
+              className="input"
+              type="time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">Ends</label>
+            <input
+              className="input"
+              type="time"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">Discipline</label>
+            <select
+              className="input"
+              value={discipline}
+              onChange={(e) => setDiscipline(e.target.value)}
+            >
+              {disciplines.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Type</label>
+            <select
+              className="input"
+              value={sessionType}
+              onChange={(e) => setSessionType(e.target.value)}
+            >
+              {sessionTypes.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Room</label>
+            <select
+              className="input"
+              value={roomId}
+              onChange={(e) => setRoomId(e.target.value)}
+            >
+              <option value=""></option>
+              {rooms.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Coach</label>
+            <select
+              className="input"
+              value={coachId}
+              onChange={(e) => setCoachId(e.target.value)}
+            >
+              <option value=""></option>
+              {people.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.full_name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-span-2">
+            <button type="submit" className="btn">
+              Create session
+            </button>
+          </div>
+        </form>
+      </section>
     </main>
   );
 }

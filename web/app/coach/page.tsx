@@ -22,6 +22,16 @@ type BusySlot = {
   room_name: string;
 };
 
+function statusBadge(status: string) {
+  const cls =
+    status === "scheduled"
+      ? "badge-scheduled"
+      : status === "cancelled"
+        ? "badge-cancelled"
+        : "badge-completed";
+  return <span className={`badge ${cls}`}>{status}</span>;
+}
+
 export default function CoachDashboard() {
   const [me, setMe] = useState<Me | null>(null);
   const [sessions, setSessions] = useState<MySession[]>([]);
@@ -49,70 +59,95 @@ export default function CoachDashboard() {
   if (loading)
     return (
       <main>
-        <p>Loading…</p>
+        <p className="text-gray-500">Loading…</p>
       </main>
     );
   if (error)
     return (
       <main>
-        <p>{error}</p>
+        <p className="text-red-600">{error}</p>
       </main>
     );
 
   return (
-    <main>
-      <h1>My sessions</h1>
-      <p>
-        Credit balance: <strong>{me?.credits}</strong>
-      </p>
+    <main className="space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold">My sessions</h1>
+        <p className="mt-1 text-gray-600">
+          Credit balance:{" "}
+          <strong className="text-gray-900">{me?.credits}</strong>
+        </p>
+      </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Discipline</th>
-            <th>Type</th>
-            <th>When</th>
-            <th>Room</th>
-            <th>Status</th>
-            <th>Attendees</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sessions.map((s) => (
-            <tr key={s.id}>
-              <td>{s.discipline}</td>
-              <td>{s.session_type}</td>
-              <td>{new Date(s.starts_at).toLocaleString()}</td>
-              <td>{s.room_name}</td>
-              <td>{s.status}</td>
-              <td>
-                {s.attendees
-                  .filter((a) => a.status === "active")
-                  .map((a) => a.full_name)
-                  .join(", ") || "—"}
-              </td>
+      <div className="card overflow-x-auto">
+        <table className="table-base">
+          <thead>
+            <tr>
+              <th>Discipline</th>
+              <th>Type</th>
+              <th>When</th>
+              <th>Room</th>
+              <th>Status</th>
+              <th>Attendees</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {sessions.map((s) => (
+              <tr key={s.id}>
+                <td className="capitalize">{s.discipline}</td>
+                <td className="capitalize">{s.session_type}</td>
+                <td>{new Date(s.starts_at).toLocaleString()}</td>
+                <td>{s.room_name}</td>
+                <td>{statusBadge(s.status)}</td>
+                <td>
+                  {s.attendees
+                    .filter((a) => a.status === "active")
+                    .map((a) => a.full_name)
+                    .join(", ") || "—"}
+                </td>
+              </tr>
+            ))}
+            {sessions.length === 0 && (
+              <tr>
+                <td colSpan={6} className="py-6 text-center text-gray-500">
+                  No sessions yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
-      <h2>Other coaches' busy periods</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>When</th>
-            <th>Room</th>
-          </tr>
-        </thead>
-        <tbody>
-          {busy.map((b) => (
-            <tr key={b.id}>
-              <td>{new Date(b.starts_at).toLocaleString()}</td>
-              <td>{b.room_name}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div>
+        <h2 className="mb-3 text-lg font-semibold">
+          Other coaches' busy periods
+        </h2>
+        <div className="card overflow-x-auto">
+          <table className="table-base">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Room</th>
+              </tr>
+            </thead>
+            <tbody>
+              {busy.map((b) => (
+                <tr key={b.id}>
+                  <td>{new Date(b.starts_at).toLocaleString()}</td>
+                  <td>{b.room_name}</td>
+                </tr>
+              ))}
+              {busy.length === 0 && (
+                <tr>
+                  <td colSpan={2} className="py-6 text-center text-gray-500">
+                    Nothing scheduled.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </main>
   );
 }

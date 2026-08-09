@@ -1,4 +1,4 @@
-//for local data use for testing purpose (in dev side)
+
 import path from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -29,7 +29,7 @@ loadEnv();
 
 const TEST_PASSWORD = "Password123!";
 
-const accounts = [
+const highlighted = [
   { email: "admin@atrium.local", label: "admin" },
   { email: "oscar.lindqvist@atrium.local", label: "coach" },
   { email: "sofia.marino@atrium.local", label: "participant" },
@@ -40,19 +40,22 @@ await client.connect();
 
 const hash = await bcrypt.hash(TEST_PASSWORD, 12);
 
-for (const account of accounts) {
-  const result = await client.query(
-    "update person set password_hash = $1 where email = $2 returning id, kind",
-    [hash, account.email],
-  );
-  if (result.rowCount === 0) {
-    console.log(`NOT FOUND: ${account.email}`);
-  } else {
+const result = await client.query(
+  "update person set password_hash = $1 where active returning id, email, kind",
+);
+
+console.log(`Set password for ${result.rowCount} active account(s).`);
+console.log(`All of them now use password: ${TEST_PASSWORD}\n`);
+
+for (const account of highlighted) {
+  const match = result.rows.find((r) => r.email === account.email);
+  if (match) {
     console.log(
-      `${account.label.padEnd(12)} ${account.email}  (id ${result.rows[0].id}, kind ${result.rows[0].kind})`,
+      `${account.label.padEnd(12)} ${account.email}  (id ${match.id}, kind ${match.kind})`,
     );
+  } else {
+    console.log(`NOT FOUND: ${account.email}`);
   }
 }
 
-console.log(`\nAll three now use password: ${TEST_PASSWORD}`);
 await client.end();

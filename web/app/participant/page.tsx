@@ -19,6 +19,11 @@ type Booking = {
   room_name: string;
 };
 
+function statusBadge(status: string) {
+  const cls = status === "active" ? "badge-active" : "badge-cancelled";
+  return <span className={`badge ${cls}`}>{status}</span>;
+}
+
 export default function ParticipantDashboard() {
   const [me, setMe] = useState<Me | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -53,53 +58,69 @@ export default function ParticipantDashboard() {
   if (loading)
     return (
       <main>
-        <p>Loading…</p>
+        <p className="text-gray-500">Loading…</p>
       </main>
     );
   if (error)
     return (
       <main>
-        <p>{error}</p>
+        <p className="text-red-600">{error}</p>
       </main>
     );
 
   return (
-    <main>
-      <h1>My bookings</h1>
-      <p>
-        Credit balance: <strong>{me?.credits}</strong>
-      </p>
+    <main className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">My bookings</h1>
+        <p className="mt-1 text-gray-600">
+          Credit balance:{" "}
+          <strong className="text-gray-900">{me?.credits}</strong>
+        </p>
+      </div>
 
-      {bookings.length === 0 && <p>No bookings yet.</p>}
-
-      <table>
-        <thead>
-          <tr>
-            <th>Discipline</th>
-            <th>Type</th>
-            <th>When</th>
-            <th>Room</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {bookings.map((b) => (
-            <tr key={b.id}>
-              <td>{b.discipline}</td>
-              <td>{b.session_type}</td>
-              <td>{new Date(b.starts_at).toLocaleString()}</td>
-              <td>{b.room_name}</td>
-              <td>{b.status}</td>
-              <td>
-                {b.status === "active" && b.session_status === "scheduled" && (
-                  <button onClick={() => cancelBooking(b.id)}>Cancel</button>
-                )}
-              </td>
+      <div className="card overflow-x-auto">
+        <table className="table-base">
+          <thead>
+            <tr>
+              <th>Discipline</th>
+              <th>Type</th>
+              <th>When</th>
+              <th>Room</th>
+              <th>Status</th>
+              <th></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {bookings.map((b) => (
+              <tr key={b.id}>
+                <td className="capitalize">{b.discipline}</td>
+                <td className="capitalize">{b.session_type}</td>
+                <td>{new Date(b.starts_at).toLocaleString()}</td>
+                <td>{b.room_name}</td>
+                <td>{statusBadge(b.status)}</td>
+                <td>
+                  {b.status === "active" &&
+                    b.session_status === "scheduled" && (
+                      <button
+                        className="btn-secondary"
+                        onClick={() => cancelBooking(b.id)}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                </td>
+              </tr>
+            ))}
+            {bookings.length === 0 && (
+              <tr>
+                <td colSpan={6} className="py-6 text-center text-gray-500">
+                  No bookings yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </main>
   );
 }

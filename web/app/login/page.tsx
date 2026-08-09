@@ -16,10 +16,12 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setLoading(true);
 
     const res = await fetch(`${apiBaseUrl}/api/login`, {
       method: "POST",
@@ -27,6 +29,8 @@ export default function Login() {
       credentials: "include",
       body: JSON.stringify({ email, password }),
     });
+
+    setLoading(false);
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
@@ -39,29 +43,35 @@ export default function Login() {
   }
 
   return (
-    <main>
-      <h1>Log in</h1>
-      <form onSubmit={onSubmit}>
-        <label>
-          <span>Email</span>
+    <main className="mx-auto max-w-sm">
+      <h1 className="mb-6 text-2xl font-bold">Log in</h1>
+      <form onSubmit={onSubmit} className="card space-y-4">
+        <div>
+          <label className="label">Email</label>
           <input
+            className="input"
             type="email"
             name="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            required
           />
-        </label>
-        <label>
-          <span>Password</span>
+        </div>
+        <div>
+          <label className="label">Password</label>
           <input
+            className="input"
             type="password"
             name="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
           />
-        </label>
-        {error && <p style={{ color: "crimson" }}>{error}</p>}
-        <button type="submit">Log in</button>
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <button type="submit" className="btn w-full" disabled={loading}>
+          {loading ? "Signing in…" : "Log in"}
+        </button>
       </form>
     </main>
   );
