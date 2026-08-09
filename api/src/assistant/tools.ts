@@ -55,7 +55,7 @@ async function searchSessions(args: {
     params.push(args.discipline);
     sql += ` and discipline = $${params.length}`;
   }
-  sql += " order by starts_at limit 25";
+  sql += " order by starts_at limit 8";
 
   const sessions = await query<any>(sql, params);
   const out = [];
@@ -302,7 +302,7 @@ async function cancelBooking(caller: Caller, args: { enrolment_id: number }) {
     [id],
   );
   if (!enrolment) throw new ToolError("no such booking");
-  // The ownership check to make the tool secure 
+  // The ownership check to make the tool secure
   if (enrolment.person_id !== personId)
     throw new ToolError("you can only cancel your own booking");
   if (enrolment.status === "cancelled")

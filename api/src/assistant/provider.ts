@@ -139,6 +139,8 @@ class OpenAiCompatibleProvider implements ModelProvider {
             parameters: t.parameters,
           },
         })),
+        tool_choice: "auto",
+        temperature: 0,
       }),
     });
 
@@ -148,7 +150,7 @@ class OpenAiCompatibleProvider implements ModelProvider {
       );
     }
 
-    const body = await res.json();
+    const body = (await res.json()) as any;
     const choice = body.choices?.[0]?.message;
     const toolCalls = choice?.tool_calls;
 
