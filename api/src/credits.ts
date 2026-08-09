@@ -54,7 +54,7 @@ export function participantRefundPercent(hoursNotice: number): number {
   return 0;
 }
 
-//make round for integer
+//make round for integer --> basically ffloor for money things
 export function refundAmount(fee: number, percent: number): number {
-  return Math.round(fee * percent);
+  return Math.floor(fee * percent);
 }

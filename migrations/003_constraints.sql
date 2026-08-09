@@ -1,4 +1,4 @@
--- migrations/003_constraints.sql
+
 begin;
 
 alter table person

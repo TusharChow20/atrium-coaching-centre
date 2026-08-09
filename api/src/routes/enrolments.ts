@@ -66,6 +66,10 @@ router.post(
         res.status(409).json({ error: "that session is not open for booking" });
         return;
       }
+      if (new Date(session.starts_at).getTime() <= Date.now()) {
+        res.status(409).json({ error: "that session has already started" });
+        return;
+      }
       if (session.coach_id === personId) {
         res
           .status(400)
