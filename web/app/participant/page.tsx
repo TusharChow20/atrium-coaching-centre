@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import WeekCalendar, {
+  CalendarEvent,
+  startOfWeek,
+} from "../components/WeekCalendar";
 
 const apiBaseUrl = process.env.API_BASE_URL || "http://localhost:4000";
 
@@ -29,6 +33,7 @@ export default function ParticipantDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
 
   function load() {
     setLoading(true);
@@ -68,8 +73,18 @@ export default function ParticipantDashboard() {
       </main>
     );
 
+  const calendarEvents: CalendarEvent[] = bookings
+    .filter((b) => b.status === "active")
+    .map((b) => ({
+      id: b.id,
+      starts_at: b.starts_at,
+      label: `${b.discipline} · ${b.room_name}`,
+      detail: b.session_type,
+      variant: "own" as const,
+    }));
+
   return (
-    <main className="space-y-6">
+    <main className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold">My bookings</h1>
         <p className="mt-1 text-gray-600">
@@ -78,49 +93,61 @@ export default function ParticipantDashboard() {
         </p>
       </div>
 
-      <div className="card overflow-x-auto">
-        <table className="table-base">
-          <thead>
-            <tr>
-              <th>Discipline</th>
-              <th>Type</th>
-              <th>When</th>
-              <th>Room</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {bookings.map((b) => (
-              <tr key={b.id}>
-                <td className="capitalize">{b.discipline}</td>
-                <td className="capitalize">{b.session_type}</td>
-                <td>{new Date(b.starts_at).toLocaleString()}</td>
-                <td>{b.room_name}</td>
-                <td>{statusBadge(b.status)}</td>
-                <td>
-                  {b.status === "active" &&
-                    b.session_status === "scheduled" && (
-                      <button
-                        className="btn-secondary"
-                        onClick={() => cancelBooking(b.id)}
-                      >
-                        Cancel
-                      </button>
-                    )}
-                </td>
-              </tr>
-            ))}
-            {bookings.length === 0 && (
+      <section>
+        <h2 className="mb-3 text-lg font-semibold">Calendar</h2>
+        <WeekCalendar
+          events={calendarEvents}
+          weekStart={weekStart}
+          onWeekChange={setWeekStart}
+        />
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-lg font-semibold">Bookings</h2>
+        <div className="card overflow-x-auto">
+          <table className="table-base">
+            <thead>
               <tr>
-                <td colSpan={6} className="py-6 text-center text-gray-500">
-                  No bookings yet.
-                </td>
+                <th>Discipline</th>
+                <th>Type</th>
+                <th>When</th>
+                <th>Room</th>
+                <th>Status</th>
+                <th></th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {bookings.map((b) => (
+                <tr key={b.id}>
+                  <td className="capitalize">{b.discipline}</td>
+                  <td className="capitalize">{b.session_type}</td>
+                  <td>{new Date(b.starts_at).toLocaleString()}</td>
+                  <td>{b.room_name}</td>
+                  <td>{statusBadge(b.status)}</td>
+                  <td>
+                    {b.status === "active" &&
+                      b.session_status === "scheduled" && (
+                        <button
+                          className="btn-secondary"
+                          onClick={() => cancelBooking(b.id)}
+                        >
+                          Cancel
+                        </button>
+                      )}
+                  </td>
+                </tr>
+              ))}
+              {bookings.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-6 text-center text-gray-500">
+                    No bookings yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
   );
 }

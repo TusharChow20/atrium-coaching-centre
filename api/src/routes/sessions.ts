@@ -10,6 +10,7 @@ import {
   refundAmount,
   roomFee,
 } from "../credits";
+import { getAdminEmails, sendMail } from "../mailer";
 
 const router = Router();
 
@@ -364,6 +365,14 @@ router.post(
           throw err;
         }
       });
+      const admins = await getAdminEmails();
+      for (const email of admins) {
+        await sendMail(
+          email,
+          "A room was booked",
+          `${created.discipline} (${created.session_type}) was booked in room ${rooms[0].name} starting ${new Date(created.starts_at).toLocaleString()}.`,
+        );
+      }
 
       res.status(201).json(created);
     } catch (err: any) {
@@ -471,7 +480,19 @@ router.patch(
         }
       });
 
-      // TODO (Phase 5): notify every enrolled participant of the new time — see plan doc.
+      const affected = await query<{ email: string }>(
+        `select p.email
+           from enrolment e join person p on p.id = e.person_id
+          where e.session_id = $1 and e.status = 'active'`,
+        [id],
+      );
+      for (const person of affected) {
+        await sendMail(
+          person.email,
+          "A session you booked was rescheduled",
+          `${session.discipline} has moved to ${new Date(updated.starts_at).toLocaleString()}.`,
+        );
+      }
       res.json(updated);
     } catch (err: any) {
       if (err && err.httpStatus) {
@@ -528,14 +549,16 @@ router.post(
 
       const summary = await withSerializableTransaction(async (client) => {
         const enrolments = await client.query(
-          "select id, person_id, credits_charged from enrolment where session_id = $1 and status = 'active'",
+          `select e.id, e.person_id, e.credits_charged, p.email, p.full_name
+             from enrolment e join person p on p.id = e.person_id
+            where e.session_id = $1 and e.status = 'active'`,
           [id],
         );
 
         let seatsRefunded = 0;
+        const notified: { email: string; full_name: string }[] = [];
 
         for (const enrolment of enrolments.rows) {
-          // Full refund for every affected participant the coach did (Section 6)
           const refund = Number(enrolment.credits_charged);
 
           await client.query(
@@ -547,6 +570,10 @@ router.post(
             [refund, enrolment.person_id],
           );
           seatsRefunded += refund;
+          notified.push({
+            email: enrolment.email,
+            full_name: enrolment.full_name,
+          });
         }
 
         await client.query(
@@ -558,10 +585,25 @@ router.post(
           [id],
         );
 
-        return { enrolments: enrolments.rowCount, seatsRefunded };
+        return { enrolments: enrolments.rowCount, seatsRefunded, notified };
       });
 
-      // TODO  notify admin + every affected participant
+      for (const person of summary.notified) {
+        await sendMail(
+          person.email,
+          "Your session was cancelled",
+          `The ${session.discipline} session you booked for ${new Date(session.starts_at).toLocaleString()} was cancelled by the coach. You have been refunded in full.`,
+        );
+      }
+      const admins = await getAdminEmails();
+      for (const email of admins) {
+        await sendMail(
+          email,
+          "A coach cancelled a session",
+          `${session.discipline} on ${new Date(session.starts_at).toLocaleString()} was cancelled, affecting ${summary.enrolments} booking(s).`,
+        );
+      }
+
       res.json({
         id,
         status: "cancelled",

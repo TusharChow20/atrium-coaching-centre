@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import WeekCalendar, {
+  CalendarEvent,
+  startOfWeek,
+} from "../components/WeekCalendar";
 
 const apiBaseUrl = process.env.API_BASE_URL || "http://localhost:4000";
 
@@ -38,6 +42,7 @@ export default function CoachDashboard() {
   const [busy, setBusy] = useState<BusySlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
 
   useEffect(() => {
     Promise.all([
@@ -69,6 +74,25 @@ export default function CoachDashboard() {
       </main>
     );
 
+  const calendarEvents: CalendarEvent[] = [
+    ...sessions
+      .filter((s) => s.status === "scheduled")
+      .map((s) => ({
+        id: s.id,
+        starts_at: s.starts_at,
+        label: `${s.discipline} · ${s.room_name}`,
+        detail: `${s.attendees.filter((a) => a.status === "active").length} attending`,
+        variant: "own" as const,
+      })),
+    ...busy.map((b) => ({
+      id: 100000 + b.id,
+      starts_at: b.starts_at,
+      label: "Busy",
+      detail: b.room_name,
+      variant: "busy" as const,
+    })),
+  ];
+
   return (
     <main className="space-y-8">
       <div>
@@ -79,75 +103,60 @@ export default function CoachDashboard() {
         </p>
       </div>
 
-      <div className="card overflow-x-auto">
-        <table className="table-base">
-          <thead>
-            <tr>
-              <th>Discipline</th>
-              <th>Type</th>
-              <th>When</th>
-              <th>Room</th>
-              <th>Status</th>
-              <th>Attendees</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sessions.map((s) => (
-              <tr key={s.id}>
-                <td className="capitalize">{s.discipline}</td>
-                <td className="capitalize">{s.session_type}</td>
-                <td>{new Date(s.starts_at).toLocaleString()}</td>
-                <td>{s.room_name}</td>
-                <td>{statusBadge(s.status)}</td>
-                <td>
-                  {s.attendees
-                    .filter((a) => a.status === "active")
-                    .map((a) => a.full_name)
-                    .join(", ") || "—"}
-                </td>
-              </tr>
-            ))}
-            {sessions.length === 0 && (
-              <tr>
-                <td colSpan={6} className="py-6 text-center text-gray-500">
-                  No sessions yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <section>
+        <h2 className="mb-3 text-lg font-semibold">Calendar</h2>
+        <p className="mb-3 text-sm text-gray-500">
+          Your own sessions show full detail. Other coaches' sessions show only
+          as busy — no discipline, no attendee names.
+        </p>
+        <WeekCalendar
+          events={calendarEvents}
+          weekStart={weekStart}
+          onWeekChange={setWeekStart}
+        />
+      </section>
 
-      <div>
-        <h2 className="mb-3 text-lg font-semibold">
-          Other coaches' busy periods
-        </h2>
+      <section>
+        <h2 className="mb-3 text-lg font-semibold">Session detail</h2>
         <div className="card overflow-x-auto">
           <table className="table-base">
             <thead>
               <tr>
+                <th>Discipline</th>
+                <th>Type</th>
                 <th>When</th>
                 <th>Room</th>
+                <th>Status</th>
+                <th>Attendees</th>
               </tr>
             </thead>
             <tbody>
-              {busy.map((b) => (
-                <tr key={b.id}>
-                  <td>{new Date(b.starts_at).toLocaleString()}</td>
-                  <td>{b.room_name}</td>
+              {sessions.map((s) => (
+                <tr key={s.id}>
+                  <td className="capitalize">{s.discipline}</td>
+                  <td className="capitalize">{s.session_type}</td>
+                  <td>{new Date(s.starts_at).toLocaleString()}</td>
+                  <td>{s.room_name}</td>
+                  <td>{statusBadge(s.status)}</td>
+                  <td>
+                    {s.attendees
+                      .filter((a) => a.status === "active")
+                      .map((a) => a.full_name)
+                      .join(", ") || "—"}
+                  </td>
                 </tr>
               ))}
-              {busy.length === 0 && (
+              {sessions.length === 0 && (
                 <tr>
-                  <td colSpan={2} className="py-6 text-center text-gray-500">
-                    Nothing scheduled.
+                  <td colSpan={6} className="py-6 text-center text-gray-500">
+                    No sessions yet.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
     </main>
   );
 }

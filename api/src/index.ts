@@ -6,6 +6,7 @@ import sessionRoutes from "./routes/sessions";
 import roomRoutes from "./routes/rooms";
 import peopleRoutes from "./routes/people";
 import enrolmentRoutes from "./routes/enrolments";
+import { startScheduler } from "./scheduler";
 const app = express();
 
 app.use(
@@ -32,3 +33,4 @@ const port = Number(process.env.API_PORT) || 4000;
 app.listen(port, () => {
   console.log(`api listening on http://localhost:${port}`);
 });
+startScheduler();
