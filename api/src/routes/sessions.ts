@@ -74,6 +74,65 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.get(
+  "/mine",
+  requireSession,
+  attachRole,
+  requireRole("coach"),
+  async (req, res) => {
+    try {
+      const coachId = res.locals.personId as number;
+      const sessions = await query(
+        `select s.*, r.name as room_name, r.capacity as room_capacity
+         from session s join room r on r.id = s.room_id
+        where s.coach_id = $1
+        order by s.starts_at desc`,
+        [coachId],
+      );
+
+      const withAttendees = [];
+      for (const session of sessions) {
+        const attendees = await query(
+          `select e.id, e.status, e.enrolled_at, e.cancelled_at, p.full_name, p.email
+           from enrolment e join person p on p.id = e.person_id
+          where e.session_id = $1
+          order by e.id`,
+          [session.id],
+        );
+        withAttendees.push({ ...session, attendees });
+      }
+      res.json(withAttendees);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "could not load your sessions" });
+    }
+  },
+);
+
+// Section 7: other coaches scheduled slots as busy periods only no discipline, no attendee data, nothing beyond "this time is taken".
+router.get(
+  "/busy",
+  requireSession,
+  attachRole,
+  requireRole("coach"),
+  async (req, res) => {
+    try {
+      const coachId = res.locals.personId as number;
+      const rows = await query(
+        `select s.id, s.starts_at, s.ends_at, r.name as room_name
+         from session s join room r on r.id = s.room_id
+        where s.coach_id <> $1 and s.status = 'scheduled'
+        order by s.starts_at`,
+        [coachId],
+      );
+      res.json(rows);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "could not load busy periods" });
+    }
+  },
+);
+
 //Section 7
 // admin: acceess everything
 // the session own coach: attented students list
@@ -181,12 +240,10 @@ router.post(
           : requesterId;
 
       if (!room_id || !discipline || !session_type || !starts_at) {
-        res
-          .status(400)
-          .json({
-            error:
-              "room_id, discipline, session_type and starts_at are all required",
-          });
+        res.status(400).json({
+          error:
+            "room_id, discipline, session_type and starts_at are all required",
+        });
         return;
       }
 
@@ -208,23 +265,18 @@ router.post(
       );
 
       if (!fitsOpeningHours(startsAtDate, endsAtDate)) {
-        res
-          .status(400)
-          .json({
-            error:
-              "the centre is closed at that time, or the session would run past close",
-          });
+        res.status(400).json({
+          error:
+            "the centre is closed at that time, or the session would run past close",
+        });
         return;
       }
 
       const noticeHours = hoursOfNotice(new Date(), startsAtDate);
       if (noticeHours < MIN_BOOKING_NOTICE_HOURS) {
-        res
-          .status(400)
-          .json({
-            error:
-              "a session must be booked at least 48 hours before it starts",
-          });
+        res.status(400).json({
+          error: "a session must be booked at least 48 hours before it starts",
+        });
         return;
       }
 
@@ -373,12 +425,10 @@ router.patch(
       );
 
       if (!fitsOpeningHours(startsAtDate, endsAtDate)) {
-        res
-          .status(400)
-          .json({
-            error:
-              "the centre is closed at that time, or the session would run past close",
-          });
+        res.status(400).json({
+          error:
+            "the centre is closed at that time, or the session would run past close",
+        });
         return;
       }
 
