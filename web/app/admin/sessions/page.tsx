@@ -60,7 +60,7 @@ export default function AdminSessions() {
 
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
+  // const [endTime, setEndTime] = useState("");
   const [discipline, setDiscipline] = useState(disciplines[0]);
   const [sessionType, setSessionType] = useState(sessionTypes[1]);
   const [roomId, setRoomId] = useState("");
@@ -128,11 +128,6 @@ export default function AdminSessions() {
         )
           .toUTC()
           .toISO(),
-        ends_at: DateTime.fromFormat(`${date} ${endTime}`, "yyyy-MM-dd HH:mm", {
-          zone: CENTRE_TIMEZONE,
-        })
-          .toUTC()
-          .toISO(),
       }),
     });
     if (!res.ok) {
@@ -194,13 +189,14 @@ export default function AdminSessions() {
                     className="h-12 border-b border-l border-gray-100 p-1 align-top"
                   >
                     {sessionsFor(day, hour).map((s) => (
-                      <div
+                      <a
                         key={s.id}
-                        className="mb-1 truncate rounded bg-brand-50 px-1.5 py-0.5 text-brand-700"
+                        href={`/admin/sessions/${s.id}`}
+                        className="mb-1 block truncate rounded bg-brand-50 px-1.5 py-0.5 text-brand-700 hover:bg-brand-100"
                       >
                         {s.discipline} · {s.room_name} ({s.enrolled_count}/
                         {s.room_capacity})
-                      </div>
+                      </a>
                     ))}
                   </td>
                 ))}
@@ -233,15 +229,7 @@ export default function AdminSessions() {
               onChange={(e) => setStartTime(e.target.value)}
             />
           </div>
-          <div>
-            <label className="label">Ends</label>
-            <input
-              className="input"
-              type="time"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-            />
-          </div>
+
           <div>
             <label className="label">Discipline</label>
             <select

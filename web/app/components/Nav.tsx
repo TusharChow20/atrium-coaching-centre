@@ -11,6 +11,7 @@ function buildLinks(kind: Me["kind"] | undefined) {
       ...base,
       { href: "/admin", label: "Dashboard" },
       { href: "/admin/sessions", label: "Manage sessions" },
+      { href: "/admin/people", label: "People" },
       { href: "/calendar", label: "Calendar" },
     ];
   }

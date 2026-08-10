@@ -77,8 +77,11 @@ function ParticipantDashboardInner() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, []);
-
+  useEffect(() => {
+    load();
+    loadBrowsable();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   async function bookSession(sessionId: number) {
     setBookingError("");
     const res = await fetch(
