@@ -3,14 +3,13 @@ import { query, withSerializableTransaction } from "../db";
 import { requireSession, attachRole, requireRole } from "../auth";
 import { fitsOpeningHours } from "../lib/centreTime";
 import {
-  coachRefundPercent,
   durationMinutes,
   hoursOfNotice,
   isValidSessionType,
-  refundAmount,
   roomFee,
 } from "../credits";
 import { getAdminEmails, sendMail } from "../mailer";
+import { cancelSessionShared, rescheduleSessionShared, ServiceError } from "../services/sessionActions";
 
 const router = Router();
 
@@ -216,6 +215,16 @@ router.get("/:id", async (req, res) => {
       return;
     }
 
+    if (kind === "coach" && personId !== session.coach_id) {
+      res.json({
+        id: session.id,
+        starts_at: session.starts_at,
+        ends_at: session.ends_at,
+        status: session.status,
+        room_name: rooms[0]?.name ?? null,
+      });
+      return;
+    }
     res.json(base);
   } catch (err) {
     console.error(err);
@@ -395,97 +404,22 @@ router.patch(
   async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const requesterId = res.locals.personId as number;
-      const requesterKind = res.locals.personKind as string;
       const newStartsAt = req.body ? req.body.starts_at : undefined;
-
       if (!Number.isInteger(id) || !newStartsAt) {
         res.status(400).json({ error: "starts_at is required" });
         return;
       }
+      const caller = {
+        id: res.locals.personId as number,
+        kind: res.locals.personKind as "admin" | "coach",
+      };
 
-      const sessions = await query("select * from session where id = $1", [id]);
-      if (sessions.length === 0) {
-        res.status(404).json({ error: "no such session" });
-        return;
-      }
-      const session = sessions[0];
-
-      if (requesterKind !== "admin" && session.coach_id !== requesterId) {
-        res
-          .status(403)
-          .json({ error: "you can only reschedule your own sessions" });
-        return;
-      }
-      if (session.status !== "scheduled") {
-        res
-          .status(409)
-          .json({ error: "only a scheduled session can be rescheduled" });
-        return;
-      }
-
-      const startsAtDate = new Date(newStartsAt);
-      if (Number.isNaN(startsAtDate.getTime())) {
-        res.status(400).json({ error: "starts_at is not a valid date" });
-        return;
-      }
-      const endsAtDate = new Date(
-        startsAtDate.getTime() + durationMinutes(session.session_type) * 60_000,
+      const { session, updated, affected } = await rescheduleSessionShared(
+        caller,
+        id,
+        new Date(newStartsAt),
       );
 
-      if (!fitsOpeningHours(startsAtDate, endsAtDate)) {
-        res.status(400).json({
-          error:
-            "the centre is closed at that time, or the session would run past close",
-        });
-        return;
-      }
-
-      const updated = await withSerializableTransaction(async (client) => {
-        const conflict = await client.query(
-          `select 1 from session
-          where status = 'scheduled' and id <> $4
-            and starts_at < $2 and ends_at > $1
-            and (
-              coach_id = $3
-              or exists (
-                select 1 from enrolment e
-                 where e.session_id = session.id and e.person_id = $3 and e.status = 'active'
-              )
-            )
-          limit 1`,
-          [startsAtDate, endsAtDate, session.coach_id, id],
-        );
-        if ((conflict.rowCount ?? 0) > 0) {
-          throw Object.assign(
-            new Error("that new time conflicts with an existing commitment"),
-            { httpStatus: 409 },
-          );
-        }
-
-        try {
-          const result = await client.query(
-            "update session set starts_at = $1, ends_at = $2 where id = $3 returning *",
-            [startsAtDate, endsAtDate, id],
-          );
-          return result.rows[0];
-        } catch (err: any) {
-          if (err.code === "23P01") {
-            throw Object.assign(
-              new Error("that room is already booked for the new time"),
-              { httpStatus: 409 },
-            );
-          }
-          throw err;
-        }
-      });
-
-      const affected = await query<{ email: string }>(
-        `select p.email
-           from enrolment e join person p on p.id = e.person_id
-          where e.session_id = $1 and e.status = 'active'`,
-        [id],
-      );
       for (const person of affected) {
         await sendMail(
           person.email,
@@ -495,7 +429,7 @@ router.patch(
       }
       res.json(updated);
     } catch (err: any) {
-      if (err && err.httpStatus) {
+      if (err instanceof ServiceError) {
         res.status(err.httpStatus).json({ error: err.message });
         return;
       }
@@ -513,89 +447,17 @@ router.post(
   async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const requesterId = res.locals.personId as number;
-      const requesterKind = res.locals.personKind as string;
-
       if (!Number.isInteger(id)) {
         res.status(404).json({ error: "no such session" });
         return;
       }
+      const caller = {
+        id: res.locals.personId as number,
+        kind: res.locals.personKind as "admin" | "coach",
+      };
 
-      const sessions = await query("select * from session where id = $1", [id]);
-      if (sessions.length === 0) {
-        res.status(404).json({ error: "no such session" });
-        return;
-      }
-      const session = sessions[0];
-
-      if (requesterKind !== "admin" && session.coach_id !== requesterId) {
-        res
-          .status(403)
-          .json({ error: "you can only cancel your own sessions" });
-        return;
-      }
-      if (session.status === "cancelled") {
-        res.status(409).json({ error: "that session is already cancelled" });
-        return;
-      }
-      if (new Date(session.starts_at).getTime() <= Date.now()) {
-        res
-          .status(409)
-          .json({
-            error:
-              "that session has already started and can no longer be cancelled",
-          });
-        return;
-      }
-
-      const percent = coachRefundPercent(
-        hoursOfNotice(new Date(), new Date(session.starts_at)),
-      );
-      const roomRefund = refundAmount(
-        Number(session.room_fee_credits),
-        percent,
-      );
-
-      const summary = await withSerializableTransaction(async (client) => {
-        const enrolments = await client.query(
-          `select e.id, e.person_id, e.credits_charged, p.email, p.full_name
-             from enrolment e join person p on p.id = e.person_id
-            where e.session_id = $1 and e.status = 'active'`,
-          [id],
-        );
-
-        let seatsRefunded = 0;
-        const notified: { email: string; full_name: string }[] = [];
-
-        for (const enrolment of enrolments.rows) {
-          const refund = Number(enrolment.credits_charged);
-
-          await client.query(
-            `update enrolment set status = 'cancelled', credits_refunded = $1, cancelled_at = now() where id = $2`,
-            [refund, enrolment.id],
-          );
-          await client.query(
-            "update person set credits = credits + $1 where id = $2",
-            [refund, enrolment.person_id],
-          );
-          seatsRefunded += refund;
-          notified.push({
-            email: enrolment.email,
-            full_name: enrolment.full_name,
-          });
-        }
-
-        await client.query(
-          "update person set credits = credits + $1 where id = $2",
-          [roomRefund, session.coach_id],
-        );
-        await client.query(
-          "update session set status = 'cancelled' where id = $1",
-          [id],
-        );
-
-        return { enrolments: enrolments.rowCount, seatsRefunded, notified };
-      });
+      const { session, percent, roomRefund, summary } =
+        await cancelSessionShared(caller, id);
 
       for (const person of summary.notified) {
         await sendMail(
@@ -621,7 +483,11 @@ router.post(
         enrolments_cancelled: summary.enrolments,
         seat_fees_refunded: summary.seatsRefunded,
       });
-    } catch (err) {
+    } catch (err: any) {
+      if (err instanceof ServiceError) {
+        res.status(err.httpStatus).json({ error: err.message });
+        return;
+      }
       console.error(err);
       res.status(500).json({ error: "could not cancel the session" });
     }

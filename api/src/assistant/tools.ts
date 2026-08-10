@@ -14,6 +14,7 @@ import { sendMail, getAdminEmails } from "../mailer";
 import { hashPassword } from "../auth";
 import { issuePasswordSetToken } from "../tokens";
 import type { ToolDefinition } from "./provider";
+import { cancelSessionShared, rescheduleSessionShared, ServiceError } from "../services/sessionActions";
 
 export type Caller =
   | { kind: "anonymous" }
@@ -370,76 +371,37 @@ async function cancelSession(caller: Caller, args: { session_id: number }) {
   if (!Number.isInteger(sessionId))
     throw new ToolError("session_id is required");
 
-  const [session] = await query<any>("select * from session where id = $1", [
-    sessionId,
-  ]);
-  if (!session) throw new ToolError("no such session");
-  if (
-    caller.kind === "coach" &&
-    session.coach_id !== (caller as any).personId
-  ) {
-    throw new ToolError("you can only cancel your own sessions");
-  }
-  if (session.status === "cancelled")
-    throw new ToolError("that session is already cancelled");
-
-  const percent = coachRefundPercent(
-    hoursOfNotice(new Date(), new Date(session.starts_at)),
-  );
-  const roomRefund = refundAmount(Number(session.room_fee_credits), percent);
-
-  const summary = await withSerializableTransaction(async (client) => {
-    const enrolments = await client.query(
-      `select e.id, e.person_id, e.credits_charged, p.email
-         from enrolment e join person p on p.id = e.person_id
-        where e.session_id = $1 and e.status = 'active'`,
-      [sessionId],
+  try {
+    const { session, roomRefund, summary } = await cancelSessionShared(
+      { id: (caller as any).personId, kind: caller.kind as "admin" | "coach" },
+      sessionId,
     );
-    const notified: string[] = [];
-    for (const e of enrolments.rows) {
-      const refund = Number(e.credits_charged);
-      await client.query(
-        "update enrolment set status = 'cancelled', credits_refunded = $1, cancelled_at = now() where id = $2",
-        [refund, e.id],
+
+    for (const person of summary.notified) {
+      await sendMail(
+        person.email,
+        "Your session was cancelled",
+        `The ${session.discipline} session you booked for ${new Date(session.starts_at).toLocaleString()} was cancelled by the coach. You have been refunded in full.`,
       );
-      await client.query(
-        "update person set credits = credits + $1 where id = $2",
-        [refund, e.person_id],
-      );
-      notified.push(e.email);
     }
-    await client.query(
-      "update person set credits = credits + $1 where id = $2",
-      [roomRefund, session.coach_id],
-    );
-    await client.query(
-      "update session set status = 'cancelled' where id = $1",
-      [sessionId],
-    );
-    return { notified };
-  });
+    const admins = await getAdminEmails();
+    for (const email of admins) {
+      await sendMail(
+        email,
+        "A coach cancelled a session",
+        `${session.discipline} on ${new Date(session.starts_at).toLocaleString()} was cancelled.`,
+      );
+    }
 
-  for (const email of summary.notified) {
-    await sendMail(
-      email,
-      "Your session was cancelled",
-      `The ${session.discipline} session you booked for ${new Date(session.starts_at).toLocaleString()} was cancelled by the coach. You have been refunded in full.`,
-    );
+    return {
+      cancelled: true,
+      room_fee_refunded: roomRefund,
+      participants_notified: summary.notified.length,
+    };
+  } catch (err) {
+    if (err instanceof ServiceError) throw new ToolError(err.message);
+    throw err;
   }
-  const admins = await getAdminEmails();
-  for (const email of admins) {
-    await sendMail(
-      email,
-      "A coach cancelled a session",
-      `${session.discipline} on ${new Date(session.starts_at).toLocaleString()} was cancelled.`,
-    );
-  }
-
-  return {
-    cancelled: true,
-    room_fee_refunded: roomRefund,
-    participants_notified: summary.notified.length,
-  };
 }
 
 async function rescheduleSession(
@@ -452,78 +414,30 @@ async function rescheduleSession(
     throw new ToolError("session_id and new_starts_at are required");
   }
 
-  const [session] = await query<any>("select * from session where id = $1", [
-    sessionId,
-  ]);
-  if (!session) throw new ToolError("no such session");
-  if (
-    caller.kind === "coach" &&
-    session.coach_id !== (caller as any).personId
-  ) {
-    throw new ToolError("you can only reschedule your own sessions");
-  }
-  if (session.status !== "scheduled")
-    throw new ToolError("only a scheduled session can be rescheduled");
-
-  const startsAt = new Date(args.new_starts_at);
-  if (Number.isNaN(startsAt.getTime()))
-    throw new ToolError("new_starts_at is not a valid date");
-  const endsAt = new Date(
-    startsAt.getTime() + durationMinutes(session.session_type) * 60_000,
-  );
-
-  if (!fitsOpeningHours(startsAt, endsAt)) {
-    throw new ToolError(
-      "the centre is closed at that time, or the session would run past close",
+  try {
+    const { session, updated, affected } = await rescheduleSessionShared(
+      { id: (caller as any).personId, kind: caller.kind as "admin" | "coach" },
+      sessionId,
+      new Date(args.new_starts_at),
     );
-  }
 
-  const updated = await withSerializableTransaction(async (client) => {
-    const conflict = await client.query(
-      `select 1 from session
-        where status = 'scheduled' and id <> $4 and starts_at < $2 and ends_at > $1
-          and (coach_id = $3 or exists (
-            select 1 from enrolment e where e.session_id = session.id and e.person_id = $3 and e.status = 'active'
-          ))
-        limit 1`,
-      [startsAt, endsAt, session.coach_id, sessionId],
-    );
-    if ((conflict.rowCount ?? 0) > 0) {
-      throw new ToolError(
-        "that new time conflicts with an existing commitment",
+    for (const p of affected) {
+      await sendMail(
+        p.email,
+        "A session you booked was rescheduled",
+        `${session.discipline} has moved to ${new Date(updated.starts_at).toLocaleString()}.`,
       );
     }
-    try {
-      const result = await client.query(
-        "update session set starts_at = $1, ends_at = $2 where id = $3 returning *",
-        [startsAt, endsAt, sessionId],
-      );
-      return result.rows[0];
-    } catch (err: any) {
-      if (err.code === "23P01")
-        throw new ToolError("that room is already booked for the new time");
-      throw err;
-    }
-  });
 
-  const affected = await query<{ email: string }>(
-    `select p.email from enrolment e join person p on p.id = e.person_id
-      where e.session_id = $1 and e.status = 'active'`,
-    [sessionId],
-  );
-  for (const p of affected) {
-    await sendMail(
-      p.email,
-      "A session you booked was rescheduled",
-      `${session.discipline} has moved to ${new Date(updated.starts_at).toLocaleString()}.`,
-    );
+    return {
+      rescheduled: true,
+      new_starts_at: updated.starts_at,
+      participants_notified: affected.length,
+    };
+  } catch (err) {
+    if (err instanceof ServiceError) throw new ToolError(err.message);
+    throw err;
   }
-
-  return {
-    rescheduled: true,
-    new_starts_at: updated.starts_at,
-    participants_notified: affected.length,
-  };
 }
 
 // Admin------------------------------------------
