@@ -18,7 +18,7 @@ type Session = {
   places_remaining: number;
 };
 
-const apiBaseUrl = process.env.API_BASE_URL || "http://localhost:4000";
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
 
 const dayNames = [
   "Monday",
@@ -61,7 +61,7 @@ export default function AdminSessions() {
   const [sessionType, setSessionType] = useState(sessionTypes[1]);
   const [roomId, setRoomId] = useState("");
   const [coachId, setCoachId] = useState("");
-
+  const [error, setError] = useState("");
   const days = [0, 1, 2, 3, 4, 5, 6].map(
     (offset) => new Date(weekStart.getTime() + offset * dayMs),
   );
@@ -86,8 +86,8 @@ export default function AdminSessions() {
     fetch(`${apiBaseUrl}/api/rooms`, { credentials: "include" })
       .then((r) => r.json())
       .then(setRooms);
-    fetch(`${apiBaseUrl}/api/people`, { credentials: "include" })
-      .then((r) => r.json())
+    fetch(`${apiBaseUrl}/api/people?kind=coach`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : []))
       .then(setPeople);
   }, []);
 
@@ -105,7 +105,8 @@ export default function AdminSessions() {
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await fetch(`${apiBaseUrl}/api/sessions`, {
+    setError("");
+    const res = await fetch(`${apiBaseUrl}/api/sessions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -118,6 +119,11 @@ export default function AdminSessions() {
         ends_at: new Date(`${date}T${endTime}`).toISOString(),
       }),
     });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(body.error || "Could not create the session");
+      return;
+    }
     loadSessions();
   }
 
@@ -191,6 +197,7 @@ export default function AdminSessions() {
       <section className="card max-w-xl">
         <h2 className="mb-4 text-lg font-semibold">Create a session</h2>
         <form onSubmit={onSubmit} className="grid grid-cols-2 gap-4">
+          {error && <p className="text-red-600">{error}</p>}
           <div>
             <label className="label">Date</label>
             <input

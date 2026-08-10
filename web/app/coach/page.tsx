@@ -5,8 +5,9 @@ import WeekCalendar, {
   CalendarEvent,
   startOfWeek,
 } from "../components/WeekCalendar";
+import RequireRole from "../components/RequireRole";
 
-const apiBaseUrl = process.env.API_BASE_URL || "http://localhost:4000";
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
 
 type Me = { id: number; full_name: string; credits: number };
 type MySession = {
@@ -37,6 +38,11 @@ function statusBadge(status: string) {
 }
 
 export default function CoachDashboard() {
+  return (
+    <RequireRole allow={["coach"]}>{() => <CoachDashboardInner />}</RequireRole>
+  );
+}
+function CoachDashboardInner() {
   const [me, setMe] = useState<Me | null>(null);
   const [sessions, setSessions] = useState<MySession[]>([]);
   const [busy, setBusy] = useState<BusySlot[]>([]);

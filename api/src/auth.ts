@@ -191,7 +191,7 @@ export async function me(_req: Request, res: Response): Promise<void> {
       "select id, email, full_name, kind, credits, active from person where id = $1",
       [res.locals.personId],
     );
-    if (people.length === 0) {
+    if (people.length === 0 || !people[0].active) {
       res.status(401).json({ error: "not signed in" });
       return;
     }

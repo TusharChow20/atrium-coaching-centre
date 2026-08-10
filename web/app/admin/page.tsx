@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import RequireRole from "../components/RequireRole";
 
 type Room = { id: number; name: string; capacity: number };
 type Person = { id: number; full_name: string; email: string; kind: string };
 type Session = { id: number; starts_at: string; ends_at: string };
 
-const apiBaseUrl = process.env.API_BASE_URL || "http://localhost:4000";
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
 
 function startOfWeek(date: Date) {
   const start = new Date(date);
@@ -16,6 +17,10 @@ function startOfWeek(date: Date) {
 }
 
 export default function AdminDashboard() {
+  return <RequireRole allow={["admin"]}>{() => <AdminDashboardInner />}</RequireRole>;
+}
+
+function AdminDashboardInner() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);

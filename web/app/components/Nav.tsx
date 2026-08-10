@@ -2,17 +2,39 @@
 
 import { useState } from "react";
 import NavAuth from "./NavAuth";
+import { useMe, Me } from "./useMe";
 
-const links = [
-  { href: "/", label: "Sessions" },
-  { href: "/admin", label: "Dashboard" },
-  { href: "/admin/sessions", label: "Calendar" },
-  { href: "/coach", label: "Coach" },
-  { href: "/participant", label: "Participant" },
-];
+function buildLinks(kind: Me["kind"] | undefined) {
+  const base = [{ href: "/", label: "Sessions" }];
+  if (kind === "admin") {
+    return [
+      ...base,
+      { href: "/admin", label: "Dashboard" },
+      { href: "/admin/sessions", label: "Manage sessions" },
+      { href: "/calendar", label: "Calendar" },
+    ];
+  }
+  if (kind === "coach") {
+    return [
+      ...base,
+      { href: "/coach", label: "My sessions" },
+      { href: "/calendar", label: "Calendar" },
+    ];
+  }
+  if (kind === "participant") {
+    return [
+      ...base,
+      { href: "/participant", label: "My bookings" },
+      { href: "/calendar", label: "Calendar" },
+    ];
+  }
+  return base;
+}
 
 export default function Nav() {
   const [open, setOpen] = useState(false);
+  const { me } = useMe();
+  const links = buildLinks(me?.kind);
 
   return (
     <nav className="border-b border-gray-200 bg-white">
