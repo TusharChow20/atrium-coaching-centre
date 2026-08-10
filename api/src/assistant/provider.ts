@@ -46,6 +46,9 @@ class StubProvider implements ModelProvider {
     if (lastTool) {
       return { kind: "final", text: summarise(lastTool.content) };
     }
+    const wantsPersonalBooking =
+      /(my booking|my session|what have i booked)/.test(text);
+    const wantsCredits = /(credit|balance)/.test(text);
 
     if (has("get_my_credits") && /(credit|balance)/.test(text)) {
       return {
@@ -60,6 +63,16 @@ class StubProvider implements ModelProvider {
       return {
         kind: "tool_calls",
         calls: [{ id: "1", name: "get_my_bookings", arguments: {} }],
+      };
+    }
+    if (
+      (wantsPersonalBooking || wantsCredits) &&
+      !has("get_my_bookings") &&
+      !has("get_my_credits")
+    ) {
+      return {
+        kind: "final",
+        text: "You're not signed in, so I can't show personal bookings or balances. Log in to see those, or ask me what sessions are available.",
       };
     }
     if (

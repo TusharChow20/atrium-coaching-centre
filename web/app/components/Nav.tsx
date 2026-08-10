@@ -5,7 +5,10 @@ import NavAuth from "./NavAuth";
 import { useMe, Me } from "./useMe";
 
 function buildLinks(kind: Me["kind"] | undefined) {
-  const base = [{ href: "/", label: "Sessions" }];
+  const base = [
+    { href: "/", label: "Sessions" },
+    { href: "/assistant", label: "Ask Atrium" },
+  ];
   if (kind === "admin") {
     return [
       ...base,
