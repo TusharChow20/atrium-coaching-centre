@@ -10,7 +10,8 @@ const SEAT_FEES: Record<string, number> = {
   intensive: 60,
 };
 
-const DURATION_MINUTES: Record<string, number> = { // 180+30 min intensive 
+const DURATION_MINUTES: Record<string, number> = {
+  // 180+30 min intensive
   short: 45,
   standard: 60,
   intensive: 210,
@@ -33,9 +34,7 @@ export function seatFee(sessionType: string): number {
 }
 
 export function hoursOfNotice(cancelledAt: Date, startsAt: Date): number {
-  return (
-    Math.abs(startsAt.getTime() - cancelledAt.getTime()) / (1000 * 60 * 60)
-  );
+  return (startsAt.getTime() - cancelledAt.getTime()) / (1000 * 60 * 60);
 }
 
 // coach cancel

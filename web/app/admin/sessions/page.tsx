@@ -1,5 +1,6 @@
 "use client";
 
+import { DateTime } from "luxon";
 import { useEffect, useState } from "react";
 
 type Room = { id: number; name: string; capacity: number };
@@ -18,7 +19,8 @@ type Session = {
   places_remaining: number;
 };
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
+const apiBaseUrl =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
 
 const dayNames = [
   "Monday",
@@ -37,6 +39,8 @@ const disciplines = [
   "career",
   "mindfulness",
 ];
+const CENTRE_TIMEZONE =
+  process.env.NEXT_PUBLIC_CENTRE_TIMEZONE || "America/New_York";
 const sessionTypes = ["short", "standard", "intensive"];
 const hours = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 const dayMs = 24 * 60 * 60 * 1000;
@@ -115,8 +119,18 @@ export default function AdminSessions() {
         coach_id: Number(coachId),
         discipline,
         session_type: sessionType,
-        starts_at: new Date(`${date}T${startTime}`).toISOString(),
-        ends_at: new Date(`${date}T${endTime}`).toISOString(),
+        starts_at: DateTime.fromFormat(
+          `${date} ${startTime}`,
+          "yyyy-MM-dd HH:mm",
+          { zone: CENTRE_TIMEZONE },
+        )
+          .toUTC()
+          .toISO(),
+        ends_at: DateTime.fromFormat(`${date} ${endTime}`, "yyyy-MM-dd HH:mm", {
+          zone: CENTRE_TIMEZONE,
+        })
+          .toUTC()
+          .toISO(),
       }),
     });
     if (!res.ok) {

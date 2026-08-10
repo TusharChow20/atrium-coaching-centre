@@ -215,6 +215,15 @@ router.post(
         res.status(409).json({ error: "that booking is already cancelled" });
         return;
       }
+      if (new Date(enrolment.starts_at).getTime() <= Date.now()) {
+        res
+          .status(409)
+          .json({
+            error:
+              "that session has already started and can no longer be cancelled",
+          });
+        return;
+      }
 
       const percent = participantRefundPercent(
         hoursOfNotice(new Date(), new Date(enrolment.starts_at)),

@@ -538,6 +538,15 @@ router.post(
         res.status(409).json({ error: "that session is already cancelled" });
         return;
       }
+      if (new Date(session.starts_at).getTime() <= Date.now()) {
+        res
+          .status(409)
+          .json({
+            error:
+              "that session has already started and can no longer be cancelled",
+          });
+        return;
+      }
 
       const percent = coachRefundPercent(
         hoursOfNotice(new Date(), new Date(session.starts_at)),
