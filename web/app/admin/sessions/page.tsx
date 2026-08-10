@@ -97,12 +97,14 @@ export default function AdminSessions() {
 
   function sessionsFor(day: Date, hour: number) {
     return sessions.filter((s) => {
-      const starts = new Date(s.starts_at);
+      const starts = DateTime.fromISO(s.starts_at, { zone: "utc" }).setZone(
+        CENTRE_TIMEZONE,
+      );
       return (
-        starts.getFullYear() === day.getFullYear() &&
-        starts.getMonth() === day.getMonth() &&
-        starts.getDate() === day.getDate() &&
-        starts.getHours() === hour
+        starts.year === day.getFullYear() &&
+        starts.month === day.getMonth() + 1 &&
+        starts.day === day.getDate() &&
+        starts.hour === hour
       );
     });
   }

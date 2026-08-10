@@ -1,5 +1,5 @@
 "use client";
-
+import { DateTime } from "luxon";
 export type CalendarEvent = {
   id: number;
   starts_at: string;
@@ -11,6 +11,7 @@ export type CalendarEvent = {
 const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const hours = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 const dayMs = 24 * 60 * 60 * 1000;
+const CENTRE_TIMEZONE = process.env.NEXT_PUBLIC_CENTRE_TIMEZONE || "America/New_York";
 
 export function startOfWeek(date: Date) {
   const start = new Date(date);
@@ -34,12 +35,14 @@ export default function WeekCalendar({
 
   function eventsFor(day: Date, hour: number) {
     return events.filter((e) => {
-      const s = new Date(e.starts_at);
+      const s = DateTime.fromISO(e.starts_at, { zone: "utc" }).setZone(
+        CENTRE_TIMEZONE,
+      );
       return (
-        s.getFullYear() === day.getFullYear() &&
-        s.getMonth() === day.getMonth() &&
-        s.getDate() === day.getDate() &&
-        s.getHours() === hour
+        s.year === day.getFullYear() &&
+        s.month === day.getMonth() + 1 &&
+        s.day === day.getDate() &&
+        s.hour === hour
       );
     });
   }

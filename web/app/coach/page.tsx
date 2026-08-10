@@ -7,7 +7,8 @@ import WeekCalendar, {
 } from "../components/WeekCalendar";
 import RequireRole from "../components/RequireRole";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
+const apiBaseUrl =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
 
 type Me = { id: number; full_name: string; credits: number };
 type MySession = {
@@ -49,6 +50,28 @@ function CoachDashboardInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+
+  async function cancelSession(id: number) {
+    if (
+      !confirm(
+        "Cancel this session? All participants will be refunded in full.",
+      )
+    )
+      return;
+    const res = await fetch(`${apiBaseUrl}/api/sessions/${id}/cancel`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      alert(body.error || "Could not cancel the session");
+      return;
+    }
+    // reload sessions after cancelling
+    fetch(`${apiBaseUrl}/api/sessions/mine`, { credentials: "include" })
+      .then((r) => r.json())
+      .then(setSessions);
+  }
 
   useEffect(() => {
     Promise.all([
@@ -134,6 +157,7 @@ function CoachDashboardInner() {
                 <th>Room</th>
                 <th>Status</th>
                 <th>Attendees</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -149,6 +173,16 @@ function CoachDashboardInner() {
                       .filter((a) => a.status === "active")
                       .map((a) => a.full_name)
                       .join(", ") || "—"}
+                  </td>
+                  <td>
+                    {s.status === "scheduled" && (
+                      <button
+                        className="btn-secondary"
+                        onClick={() => cancelSession(s.id)}
+                      >
+                        Cancel
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

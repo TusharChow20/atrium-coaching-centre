@@ -16,7 +16,7 @@ router.get(
   "/mine",
   requireSession,
   attachRole,
-  requireRole("participant"),
+  requireRole("participant", "coach"),
   async (req, res) => {
     try {
       const personId = res.locals.personId as number;
@@ -43,7 +43,7 @@ router.post(
   "/sessions/:sessionId/enrol",
   requireSession,
   attachRole,
-  requireRole("participant"),
+  requireRole("participant", "coach"),
   async (req, res) => {
     try {
       const sessionId = Number(req.params.sessionId);
@@ -78,7 +78,7 @@ router.post(
       }
 
       const people = await query(
-        "select credits from person where id = $1 and kind = 'participant' and active",
+        "select credits from person where id = $1 and active",
         [personId],
       );
       if (people.length === 0) {
@@ -184,7 +184,7 @@ router.post(
   "/:id/cancel",
   requireSession,
   attachRole,
-  requireRole("participant", "admin"),
+  requireRole("participant", "coach"),
   async (req, res) => {
     try {
       const id = Number(req.params.id);
@@ -216,12 +216,10 @@ router.post(
         return;
       }
       if (new Date(enrolment.starts_at).getTime() <= Date.now()) {
-        res
-          .status(409)
-          .json({
-            error:
-              "that session has already started and can no longer be cancelled",
-          });
+        res.status(409).json({
+          error:
+            "that session has already started and can no longer be cancelled",
+        });
         return;
       }
 
