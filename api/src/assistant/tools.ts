@@ -53,7 +53,7 @@ async function searchSessions(args: {
   }
   if (args.discipline) {
     params.push(args.discipline);
-    sql += ` and discipline = $${params.length}`;
+    sql += ` and discipline ilike $${params.length}`;
   }
   sql += " order by starts_at limit 8";
 

@@ -41,8 +41,8 @@ const hash = await bcrypt.hash(TEST_PASSWORD, 12);
 
 const result = await client.query(
   "update person set password_hash = $1 where active returning id, email, kind",
+  [hash],
 );
-
 console.log(`Set password for ${result.rowCount} active account(s).`);
 console.log(`All of them now use password: ${TEST_PASSWORD}\n`);
 

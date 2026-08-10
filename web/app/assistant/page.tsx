@@ -15,14 +15,18 @@ export default function AssistantPage() {
     if (!input.trim()) return;
     const message = input;
     setInput("");
-    setTurns((t) => [...t, { role: "user", text: message }]);
+    const nextTurns: Turn[] = [...turns, { role: "user", text: message }];
+    setTurns(nextTurns);
     setLoading(true);
 
     const res = await fetch(`${apiBaseUrl}/api/assistant`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({
+        message,
+        history: turns, // turns BEFORE this message — the new user turn goes in `message`
+      }),
     });
     const body = await res.json();
     setLoading(false);
