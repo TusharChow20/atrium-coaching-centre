@@ -6,6 +6,7 @@ import WeekCalendar, {
   startOfWeek,
 } from "../components/WeekCalendar";
 import RequireRole from "../components/RequireRole";
+import { formatCentreDateTime } from "../lib/formatCentreTime";
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
 
