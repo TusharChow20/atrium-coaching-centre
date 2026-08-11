@@ -9,7 +9,11 @@ import {
   roomFee,
 } from "../credits";
 import { getAdminEmails, sendMail } from "../mailer";
-import { cancelSessionShared, rescheduleSessionShared, ServiceError } from "../services/sessionActions";
+import {
+  cancelSessionShared,
+  rescheduleSessionShared,
+  ServiceError,
+} from "../services/sessionActions";
 
 const router = Router();
 
@@ -82,26 +86,33 @@ router.get(
   async (req, res) => {
     try {
       const coachId = res.locals.personId as number;
-      const sessions = await query(
-        `select s.*, r.name as room_name, r.capacity as room_capacity
-         from session s join room r on r.id = s.room_id
-        where s.coach_id = $1
-        order by s.starts_at desc`,
+      const rows = await query(
+        `select s.id, s.room_id, s.coach_id, s.discipline, s.session_type, s.status,
+                s.starts_at, s.ends_at, s.room_fee_credits, s.seat_fee_credits,
+                r.name as room_name, r.capacity as room_capacity,
+                coalesce(
+                  json_agg(
+                    json_build_object(
+                      'id', e.id,
+                      'status', e.status,
+                      'enrolled_at', e.enrolled_at,
+                      'cancelled_at', e.cancelled_at,
+                      'full_name', p.full_name,
+                      'email', p.email
+                    ) order by e.id
+                  ) filter (where e.id is not null),
+                  '[]'
+                ) as attendees
+           from session s
+           join room r on r.id = s.room_id
+      left join enrolment e on e.session_id = s.id
+      left join person p on p.id = e.person_id
+          where s.coach_id = $1
+          group by s.id, r.name, r.capacity
+          order by s.starts_at desc`,
         [coachId],
       );
-
-      const withAttendees = [];
-      for (const session of sessions) {
-        const attendees = await query(
-          `select e.id, e.status, e.enrolled_at, e.cancelled_at, p.full_name, p.email
-           from enrolment e join person p on p.id = e.person_id
-          where e.session_id = $1
-          order by e.id`,
-          [session.id],
-        );
-        withAttendees.push({ ...session, attendees });
-      }
-      res.json(withAttendees);
+      res.json(rows);
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "could not load your sessions" });
