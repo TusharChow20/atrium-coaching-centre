@@ -55,12 +55,20 @@ function ParticipantDashboardInner() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [browsable, setBrowsable] = useState<Browsable[]>([]);
   const [bookingError, setBookingError] = useState("");
-
+  const [page, setPage] = useState(1);
+  const [bookingsPage, setBookingsPage] = useState(1);
+  const PAGE_SIZE = 8;
   function loadBrowsable() {
     const from = new Date().toISOString();
-    fetch(`${apiBaseUrl}/api/sessions?from=${from}`, { credentials: "include" })
+    const to = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    fetch(`${apiBaseUrl}/api/sessions?from=${from}&to=${to}`, {
+      credentials: "include",
+    })
       .then((r) => r.json())
-      .then(setBrowsable);
+      .then((data) => {
+        setBrowsable(data);
+        setPage(1); // reset to first page whenever the list reloads
+      });
   }
   function load() {
     setLoading(true);
@@ -72,6 +80,7 @@ function ParticipantDashboardInner() {
         if (!meRes.ok || !bookingsRes.ok) throw new Error("not signed in");
         setMe(await meRes.json());
         setBookings(await bookingsRes.json());
+        setBookingsPage(1);
       })
       .catch(() => setError("Please log in as a participant to see this page."))
       .finally(() => setLoading(false));
@@ -126,7 +135,17 @@ function ParticipantDashboardInner() {
       detail: b.session_type,
       variant: "own" as const,
     }));
+  const totalPages = Math.max(1, Math.ceil(browsable.length / PAGE_SIZE));
+  const pageItems = browsable.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const bookingsTotalPages = Math.max(
+    1,
+    Math.ceil(bookings.length / PAGE_SIZE),
+  );
+  const bookingsPageItems = bookings.slice(
+    (bookingsPage - 1) * PAGE_SIZE,
+    bookingsPage * PAGE_SIZE,
+  );
   return (
     <main className="space-y-8">
       <div>
@@ -155,7 +174,7 @@ function ParticipantDashboardInner() {
               </tr>
             </thead>
             <tbody>
-              {browsable.map((s) => {
+              {pageItems.map((s) => {
                 const alreadyBooked = bookings.some(
                   (b) => b.session_id === s.id && b.status === "active",
                 );
@@ -195,6 +214,31 @@ function ParticipantDashboardInner() {
             </tbody>
           </table>
         </div>
+        {browsable.length > PAGE_SIZE && (
+          <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
+            <span>
+              Showing {(page - 1) * PAGE_SIZE + 1}–
+              {Math.min(page * PAGE_SIZE, browsable.length)} of{" "}
+              {browsable.length}
+            </span>
+            <div className="flex gap-2">
+              <button
+                className="btn-secondary"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                ← Previous
+              </button>
+              <button
+                className="btn-secondary"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
       </section>
       <section>
         <h2 className="mb-3 text-lg font-semibold">Calendar</h2>
@@ -220,7 +264,7 @@ function ParticipantDashboardInner() {
               </tr>
             </thead>
             <tbody>
-              {bookings.map((b) => (
+              {bookingsPageItems.map((b) => (
                 <tr key={b.id}>
                   <td className="capitalize">{b.discipline}</td>
                   <td className="capitalize">{b.session_type}</td>
@@ -250,6 +294,31 @@ function ParticipantDashboardInner() {
             </tbody>
           </table>
         </div>
+        {bookings.length > PAGE_SIZE && (
+          <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
+            <span>
+              Showing {(bookingsPage - 1) * PAGE_SIZE + 1}–
+              {Math.min(bookingsPage * PAGE_SIZE, bookings.length)} of{" "}
+              {bookings.length}
+            </span>
+            <div className="flex gap-2">
+              <button
+                className="btn-secondary"
+                disabled={bookingsPage <= 1}
+                onClick={() => setBookingsPage((p) => p - 1)}
+              >
+                ← Previous
+              </button>
+              <button
+                className="btn-secondary"
+                disabled={bookingsPage >= bookingsTotalPages}
+                onClick={() => setBookingsPage((p) => p + 1)}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
       </section>
     </main>
   );
