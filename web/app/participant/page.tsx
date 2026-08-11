@@ -6,6 +6,7 @@ import WeekCalendar, {
   startOfWeek,
 } from "../components/WeekCalendar";
 import RequireRole from "../components/RequireRole";
+import { formatCentreDateTime } from "../lib/formatCentreTime";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
@@ -182,7 +183,7 @@ function ParticipantDashboardInner() {
                   <tr key={s.id}>
                     <td className="capitalize">{s.discipline}</td>
                     <td className="capitalize">{s.session_type}</td>
-                    <td>{new Date(s.starts_at).toLocaleString()}</td>
+                    <td>{formatCentreDateTime(s.starts_at)}</td>
                     <td>{s.room_name}</td>
                     <td>{s.coach_name}</td>
                     <td>
@@ -268,7 +269,7 @@ function ParticipantDashboardInner() {
                 <tr key={b.id}>
                   <td className="capitalize">{b.discipline}</td>
                   <td className="capitalize">{b.session_type}</td>
-                  <td>{new Date(b.starts_at).toLocaleString()}</td>
+                  <td>{formatCentreDateTime(b.starts_at)}</td>
                   <td>{b.room_name}</td>
                   <td>{statusBadge(b.status)}</td>
                   <td>

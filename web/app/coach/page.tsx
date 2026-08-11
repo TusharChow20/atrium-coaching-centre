@@ -6,7 +6,6 @@ import WeekCalendar, {
   startOfWeek,
 } from "../components/WeekCalendar";
 import RequireRole from "../components/RequireRole";
-
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
 
@@ -165,7 +164,7 @@ function CoachDashboardInner() {
                 <tr key={s.id}>
                   <td className="capitalize">{s.discipline}</td>
                   <td className="capitalize">{s.session_type}</td>
-                  <td>{new Date(s.starts_at).toLocaleString()}</td>
+                  <td>{formatCentreDateTime(s.starts_at)}</td>
                   <td>{s.room_name}</td>
                   <td>{statusBadge(s.status)}</td>
                   <td>

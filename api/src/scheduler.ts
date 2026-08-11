@@ -1,4 +1,3 @@
-
 import cron from "node-cron";
 import { DateTime } from "luxon";
 import { query } from "./db";
@@ -95,7 +94,6 @@ export function startScheduler() {
     console.log("scheduler disabled via SCHEDULER_ENABLED=false");
     return;
   }
-
 
   cron.schedule(
     "0 0 * * *",
